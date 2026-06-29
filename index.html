@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>网球账本</title>
+<!-- 添加到主屏幕后全屏、像 App 一样运行 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="网球账本">
+<meta name="theme-color" content="#16432f">
+<style>
+  :root{
+    --court:#16432f;        /* 球场深绿 */
+    --court-2:#1f5a40;
+    --ball:#d7f205;         /* 网球荧光黄 */
+    --ball-dim:#aac400;
+    --line:#ffffff;         /* 场地白线 */
+    --paper:#f6f6f1;
+    --card:#ffffff;
+    --ink:#1a1d1a;
+    --ink-soft:#6b716a;
+    --hair:#e6e6df;
+    --danger:#c1452e;
+    /* 分类色 */
+    --c-court:#2f7d57;
+    --c-coach:#d98324;
+    --c-gear:#3a6ea5;
+    --c-spar:#8d5bbd;
+    --c-comp:#c1452e;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    font-variant-numeric:tabular-nums;
+  }
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
+
+  /* ---------- 顶栏 ---------- */
+  header{
+    background:var(--court);
+    color:#fff;
+    padding:calc(env(safe-area-inset-top) + 16px) 20px 16px;
+    position:sticky;top:0;z-index:20;
+  }
+  header .brand{display:flex;align-items:center;gap:10px;}
+  .ball-dot{
+    width:22px;height:22px;border-radius:50%;
+    background:var(--ball);
+    position:relative;flex:none;
+    box-shadow:0 0 0 1px rgba(0,0,0,.05) inset;
+  }
+  .ball-dot::before,.ball-dot::after{
+    content:"";position:absolute;inset:0;border-radius:50%;
+    border:1.5px solid var(--court);
+  }
+  .ball-dot::before{clip-path:inset(0 50% 0 0);transform:scaleX(1.6);left:-30%;}
+  .ball-dot::after{clip-path:inset(0 0 0 50%);transform:scaleX(1.6);right:-30%;left:auto;}
+  header h1{font-size:18px;font-weight:700;margin:0;letter-spacing:.5px;}
+  header .sub{font-size:12px;color:rgba(255,255,255,.6);margin-top:2px;}
+
+  /* ---------- 主体 ---------- */
+  main{padding:16px 16px 96px;max-width:520px;margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+  /* ---------- 记账表单 ---------- */
+  .field{margin-bottom:18px;}
+  .field-label{font-size:13px;color:var(--ink-soft);margin-bottom:8px;font-weight:600;letter-spacing:.3px;}
+
+  .seg{display:flex;background:var(--card);border:1px solid var(--hair);border-radius:14px;padding:4px;gap:4px;}
+  .seg button{
+    flex:1;border:0;background:transparent;padding:12px 0;border-radius:10px;
+    font-size:15px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;
+    transition:all .18s;
+  }
+  .seg button.on{background:var(--court);color:#fff;}
+  .seg.ball button.on{background:var(--ball);color:var(--court);}
+
+  .cats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+  .cat{
+    border:1px solid var(--hair);background:var(--card);border-radius:14px;
+    padding:12px 4px 10px;text-align:center;cursor:pointer;transition:all .18s;
+  }
+  .cat .ic{font-size:22px;line-height:1;display:block;margin-bottom:6px;}
+  .cat .nm{font-size:11px;color:var(--ink-soft);font-weight:600;}
+  .cat.on{border-color:transparent;color:#fff;}
+  .cat.on .nm{color:#fff;}
+
+  .amount-box{
+    background:var(--court);border-radius:18px;padding:18px 20px;
+    display:flex;align-items:baseline;gap:6px;
+  }
+  .amount-box .cny{color:var(--ball);font-size:26px;font-weight:700;}
+  .amount-box input{
+    flex:1;background:transparent;border:0;outline:0;color:#fff;
+    font-size:40px;font-weight:700;font-family:inherit;width:100%;
+    font-variant-numeric:tabular-nums;letter-spacing:1px;
+  }
+  .amount-box input::placeholder{color:rgba(255,255,255,.25);}
+
+  input[type=date]{
+    width:100%;background:var(--card);border:1px solid var(--hair);border-radius:14px;
+    padding:13px 14px;font-size:15px;font-family:inherit;color:var(--ink);outline:0;
+  }
+
+  .save-btn{
+    width:100%;background:var(--ball);color:var(--court);border:0;border-radius:16px;
+    padding:17px;font-size:17px;font-weight:800;font-family:inherit;cursor:pointer;
+    letter-spacing:1px;margin-top:6px;transition:transform .1s,opacity .2s;
+  }
+  .save-btn:active{transform:scale(.98);}
+  .save-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  /* ---------- 明细 ---------- */
+  .filter-row{display:flex;gap:8px;margin-bottom:14px;}
+  .chip{
+    border:1px solid var(--hair);background:var(--card);border-radius:20px;
+    padding:7px 16px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+  }
+  .chip.on{background:var(--court);color:#fff;border-color:var(--court);}
+
+  .month-group{margin-bottom:20px;}
+  .month-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:0 4px 8px;border-bottom:2px solid var(--court);margin-bottom:8px;
+  }
+  .month-head .m{font-size:14px;font-weight:700;}
+  .month-head .t{font-size:14px;font-weight:700;color:var(--court);}
+
+  .rec{
+    display:flex;align-items:center;gap:12px;background:var(--card);
+    border:1px solid var(--hair);border-radius:14px;padding:12px 14px;margin-bottom:8px;
+  }
+  .rec .badge{
+    width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+    font-size:20px;flex:none;
+  }
+  .rec .meta{flex:1;min-width:0;}
+  .rec .meta .top{font-size:15px;font-weight:600;display:flex;align-items:center;gap:7px;}
+  .rec .meta .who{font-size:11px;padding:1px 7px;border-radius:6px;font-weight:600;}
+  .rec .meta .dt{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .rec .amt{font-size:17px;font-weight:700;white-space:nowrap;}
+  .rec .del{
+    border:0;background:transparent;color:var(--ink-soft);font-size:20px;
+    padding:4px 2px 4px 8px;cursor:pointer;line-height:1;
+  }
+  .rec .del:active{color:var(--danger);}
+
+  /* ---------- 统计 ---------- */
+  .score{
+    background:var(--court);border-radius:20px;padding:22px 22px 20px;color:#fff;
+    margin-bottom:18px;position:relative;overflow:hidden;
+  }
+  .score::after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;
+    border-radius:50%;border:2px solid rgba(255,255,255,.07);}
+  .score .lab{font-size:12px;color:rgba(255,255,255,.6);letter-spacing:1px;}
+  .score .big{font-size:46px;font-weight:800;color:var(--ball);margin-top:4px;letter-spacing:1px;}
+  .score .big small{font-size:22px;margin-right:2px;}
+  .score .cnt{font-size:12px;color:rgba(255,255,255,.55);margin-top:6px;}
+
+  .panel{background:var(--card);border:1px solid var(--hair);border-radius:18px;padding:18px;margin-bottom:16px;}
+  .panel h3{margin:0 0 14px;font-size:14px;font-weight:700;letter-spacing:.3px;}
+
+  .bar-row{margin-bottom:13px;}
+  .bar-row:last-child{margin-bottom:0;}
+  .bar-row .lh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;}
+  .bar-row .lh .l{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px;}
+  .bar-row .lh .v{font-size:13.5px;font-weight:700;}
+  .bar-row .lh .v .pct{font-size:11px;color:var(--ink-soft);font-weight:500;margin-left:5px;}
+  .track{height:9px;background:#ecece5;border-radius:6px;overflow:hidden;}
+  .track .fill{height:100%;border-radius:6px;transition:width .5s ease;}
+
+  .split{display:flex;gap:12px;}
+  .split .half{flex:1;text-align:center;padding:14px 8px;border-radius:14px;background:#f1f1ea;}
+  .split .half .nm{font-size:13px;color:var(--ink-soft);font-weight:600;}
+  .split .half .v{font-size:24px;font-weight:800;margin-top:4px;}
+  .split .half .pct{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+
+  .empty{text-align:center;color:var(--ink-soft);padding:60px 20px;}
+  .empty .e-ball{font-size:42px;opacity:.4;}
+  .empty p{margin:14px 0 0;font-size:14px;}
+
+  /* ---------- 底部导航 ---------- */
+  nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:30;
+    background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+    border-top:1px solid var(--hair);
+    display:flex;padding:8px 0 calc(env(safe-area-inset-bottom) + 8px);
+  }
+  nav button{
+    flex:1;border:0;background:transparent;padding:6px 0;cursor:pointer;font-family:inherit;
+    display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink-soft);
+  }
+  nav button .ni{font-size:21px;line-height:1;}
+  nav button .nl{font-size:11px;font-weight:600;}
+  nav button.on{color:var(--court);}
+
+  .toast{
+    position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:11px 22px;border-radius:24px;font-size:14px;font-weight:600;
+    opacity:0;pointer-events:none;transition:all .3s;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* ---------- 编辑面板 ---------- */
+  .sheet-mask{
+    position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.4);
+    opacity:0;pointer-events:none;transition:opacity .25s;
+  }
+  .sheet-mask.show{opacity:1;pointer-events:auto;}
+  .sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:41;
+    background:var(--paper);border-radius:22px 22px 0 0;
+    padding:8px 18px calc(env(safe-area-inset-bottom) + 18px);
+    max-width:520px;margin:0 auto;
+    transform:translateY(110%);transition:transform .3s cubic-bezier(.2,.8,.2,1);
+    max-height:90vh;overflow-y:auto;
+  }
+  .sheet.show{transform:translateY(0);}
+  .sheet .grab{width:40px;height:4px;border-radius:3px;background:var(--hair);margin:8px auto 14px;}
+  .sheet .sheet-title{font-size:17px;font-weight:700;margin-bottom:18px;}
+  .sheet .save-btn{margin-top:2px;}
+  .sheet .del-link{
+    width:100%;border:0;background:transparent;color:var(--danger);
+    font-size:15px;font-weight:600;font-family:inherit;padding:14px;margin-top:6px;cursor:pointer;
+  }
+
+  /* ---------- 导出 ---------- */
+  .list-toolbar{margin-bottom:14px;}
+  .list-toolbar .filter-row{margin-bottom:10px;}
+  .toolbar-actions{display:flex;justify-content:flex-end;gap:8px;}
+  .export-btn{
+    border:1px solid var(--court);background:var(--card);color:var(--court);
+    border-radius:20px;padding:7px 16px;font-size:13px;font-weight:700;font-family:inherit;
+    cursor:pointer;white-space:nowrap;flex:none;
+  }
+  .export-btn:active{background:var(--court);color:#fff;}
+  .export-desc{font-size:13px;color:var(--ink-soft);line-height:1.6;}
+  .ghost-btn{
+    width:100%;border:1px solid var(--hair);background:var(--card);color:var(--ink);
+    border-radius:16px;padding:15px;font-size:15px;font-weight:700;font-family:inherit;
+    cursor:pointer;margin-top:10px;
+  }
+  .ghost-btn:active{background:#f1f1ea;}
+  .export-preview{
+    width:100%;height:140px;border:1px solid var(--hair);border-radius:12px;
+    padding:10px 12px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:var(--ink-soft);background:#fafaf5;resize:none;outline:0;line-height:1.6;
+    -webkit-overflow-scrolling:touch;
+  }
+  .import-result{
+    font-size:13.5px;line-height:1.6;margin:14px 0 4px;padding:12px 14px;border-radius:12px;
+    display:none;
+  }
+  .import-result.ok{display:block;background:#e6f1ea;color:#16432f;}
+  .import-result.warn{display:block;background:#fbf0d9;color:#8a5210;}
+  .import-result.err{display:block;background:#f7e3df;color:#9a2f1c;}
+  .import-result b{font-weight:800;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="ball-dot"></span>
+    <div>
+      <h1>网球账本</h1>
+      <div class="sub">记录每一笔球场上的开销</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- 记账 -->
+  <section class="view active" id="view-add">
+    <div class="field">
+      <div class="field-label">谁花的</div>
+      <div class="seg" id="person-seg">
+        <button data-person="李翔" class="on">李翔</button>
+        <button data-person="傅聿昕">傅聿昕</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-label">日期</div>
+      <input type="date" id="date-input">
+    </div>
+
+    <div class="field">
+      <div class="field-label">费用类型</div>
+      <div class="cats" id="cats"></div>
+    </div>
+
+    <div class="field">
+      <div class="field-label">金额</div>
+      <div class="amount-box">
+        <span class="cny">¥</span>
+        <input type="text" inputmode="decimal" id="amount-input" placeholder="0">
+      </div>
+    </div>
+
+    <button class="save-btn" id="save-btn">记 一 笔</button>
+  </section>
+
+  <!-- 明细 -->
+  <section class="view" id="view-list">
+    <div class="list-toolbar">
+      <div class="filter-row" id="list-filter">
+        <button class="chip on" data-f="all">全部</button>
+        <button class="chip" data-f="李翔">李翔</button>
+        <button class="chip" data-f="傅聿昕">傅聿昕</button>
+      </div>
+      <div class="toolbar-actions">
+        <button class="export-btn" id="open-import">↥ 导入</button>
+        <button class="export-btn" id="open-export">↧ 导出</button>
+      </div>
+    </div>
+    <div id="list-body"></div>
+  </section>
+
+  <!-- 统计 -->
+  <section class="view" id="view-stats">
+    <div class="filter-row" id="stat-filter">
+      <button class="chip on" data-f="all">全部</button>
+      <button class="chip" data-f="李翔">李翔</button>
+      <button class="chip" data-f="傅聿昕">傅聿昕</button>
+    </div>
+    <div id="stats-body"></div>
+  </section>
+</main>
+
+<nav>
+  <button class="on" data-tab="add"><span class="ni">✎</span><span class="nl">记账</span></button>
+  <button data-tab="list"><span class="ni">☰</span><span class="nl">明细</span></button>
+  <button data-tab="stats"><span class="ni">◔</span><span class="nl">统计</span></button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<!-- 编辑面板 -->
+<div class="sheet-mask" id="sheet-mask"></div>
+<div class="sheet" id="edit-sheet">
+  <div class="grab"></div>
+  <div class="sheet-title">编辑记录</div>
+
+  <div class="field">
+    <div class="field-label">谁花的</div>
+    <div class="seg" id="e-person-seg">
+      <button data-person="李翔">李翔</button>
+      <button data-person="傅聿昕">傅聿昕</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">日期</div>
+    <input type="date" id="e-date-input">
+  </div>
+
+  <div class="field">
+    <div class="field-label">费用类型</div>
+    <div class="cats" id="e-cats"></div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">金额</div>
+    <div class="amount-box">
+      <span class="cny">¥</span>
+      <input type="text" inputmode="decimal" id="e-amount-input" placeholder="0">
+    </div>
+  </div>
+
+  <button class="save-btn" id="e-save-btn">保 存 修 改</button>
+  <button class="del-link" id="e-del-btn">删除这条记录</button>
+</div>
+
+<!-- 导出面板 -->
+<div class="sheet" id="export-sheet">
+  <div class="grab"></div>
+  <div class="sheet-title">导出数据</div>
+  <div class="export-desc" id="export-desc"></div>
+
+  <div class="field" style="margin-top:14px;">
+    <div class="field-label">范围</div>
+    <div class="seg" id="export-scope">
+      <button data-s="all" class="on">全部</button>
+      <button data-s="李翔">李翔</button>
+      <button data-s="傅聿昕">傅聿昕</button>
+    </div>
+  </div>
+
+  <button class="save-btn" id="export-share">保存 / 分享文件</button>
+  <button class="ghost-btn" id="export-copy">复制全部数据</button>
+
+  <div class="field" style="margin-top:14px;">
+    <div class="field-label">预览（CSV，可用 Excel / Numbers 打开）</div>
+    <textarea id="export-preview" class="export-preview" readonly></textarea>
+  </div>
+  <button class="del-link" id="export-close" style="color:var(--ink-soft);">关闭</button>
+</div>
+
+<!-- 导入面板 -->
+<div class="sheet" id="import-sheet">
+  <div class="grab"></div>
+  <div class="sheet-title">导入数据</div>
+  <div class="export-desc">读取之前导出的 CSV（含 日期 / 主体 / 类型 / 金额 四列）。可选择文件，或把复制的内容直接粘贴进来。</div>
+
+  <div class="field" style="margin-top:14px;">
+    <div class="field-label">导入方式</div>
+    <div class="seg" id="import-mode">
+      <button data-m="append" class="on">追加到现有</button>
+      <button data-m="replace">覆盖全部</button>
+    </div>
+  </div>
+
+  <input type="file" id="import-file" accept=".csv,text/csv,.txt" style="display:none">
+  <button class="ghost-btn" id="import-pick">📄 选择 CSV 文件</button>
+
+  <div class="field" style="margin-top:14px;">
+    <div class="field-label">或粘贴 CSV 内容</div>
+    <textarea id="import-paste" class="export-preview" placeholder="把复制的内容粘贴到这里，然后点下方「解析」"></textarea>
+  </div>
+  <button class="ghost-btn" id="import-parse">解析粘贴内容</button>
+
+  <div class="import-result" id="import-result"></div>
+
+  <button class="save-btn" id="import-confirm" disabled>确认导入</button>
+  <button class="del-link" id="import-close" style="color:var(--ink-soft);">关闭</button>
+</div>
+
+<script>
+const CATS = [
+  {key:"场地费", ic:"🎾", color:"var(--c-court)"},
+  {key:"教练费", ic:"🧑‍🏫", color:"var(--c-coach)"},
+  {key:"装备费", ic:"🎒", color:"var(--c-gear)"},
+  {key:"陪练费", ic:"🤝", color:"var(--c-spar)"},
+  {key:"参赛费", ic:"🏆", color:"var(--c-comp)"},
+];
+const WHO_COLOR = {"李翔":{bg:"#e2efe8",fg:"#16432f"}, "傅聿昕":{bg:"#fbf0d9",fg:"#9a5e15"}};
+const STORE_KEY = "tennis-ledger:records";
+
+let records = [];
+let sel = {person:"李翔", category:"场地费"};
+let listFilter = "all";
+let statFilter = "all";
+
+/* ---------- 工具 ---------- */
+const $ = s => document.querySelector(s);
+const fmt = n => n.toLocaleString("zh-CN",{minimumFractionDigits: Number.isInteger(n)?0:2, maximumFractionDigits:2});
+const catOf = k => CATS.find(c=>c.key===k);
+const todayStr = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+
+function toast(msg){
+  const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove("show"),1600);
+}
+
+/* ---------- 存储 ----------
+   适配两种环境：
+   - 在 Claude 里打开：使用 Claude 的 window.storage
+   - 在手机/电脑浏览器里单独打开：自动改用浏览器 localStorage
+*/
+const Store = {
+  async get(key){
+    if(typeof window!=="undefined" && window.storage && window.storage.get){
+      try{ const r=await window.storage.get(key); return (r && r.value!=null) ? r.value : null; }
+      catch(e){ /* 落到 localStorage */ }
+    }
+    try{ return localStorage.getItem(key); }catch(e){ return null; }
+  },
+  async set(key,val){
+    if(typeof window!=="undefined" && window.storage && window.storage.set){
+      try{ await window.storage.set(key,val); return true; }
+      catch(e){ /* 落到 localStorage */ }
+    }
+    try{ localStorage.setItem(key,val); return true; }catch(e){ return false; }
+  }
+};
+
+async function load(){
+  try{
+    const raw = await Store.get(STORE_KEY);
+    records = raw ? JSON.parse(raw) : [];
+  }catch(e){ records = []; }
+}
+async function save(){
+  const ok = await Store.set(STORE_KEY, JSON.stringify(records));
+  if(!ok) toast("保存失败，请重试");
+}
+
+/* ---------- 记账页 ---------- */
+function buildCats(){
+  const wrap=$("#cats"); wrap.innerHTML="";
+  CATS.forEach(c=>{
+    const el=document.createElement("div");
+    el.className="cat"+(sel.category===c.key?" on":"");
+    if(sel.category===c.key) el.style.background=c.color;
+    el.innerHTML=`<span class="ic">${c.ic}</span><span class="nm">${c.key.replace("费","")}</span>`;
+    el.onclick=()=>{ sel.category=c.key; buildCats(); };
+    wrap.appendChild(el);
+  });
+}
+
+$("#person-seg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  sel.person=b.dataset.person;
+  [...$("#person-seg").children].forEach(x=>x.classList.toggle("on",x===b));
+});
+
+$("#save-btn").addEventListener("click", async ()=>{
+  const amt=parseFloat($("#amount-input").value);
+  const date=$("#date-input").value;
+  if(!date){ toast("请选择日期"); return; }
+  if(!amt || amt<=0){ toast("请输入金额"); return; }
+  records.push({
+    id:Date.now()+""+Math.floor(Math.random()*999),
+    person:sel.person, date, category:sel.category, amount:amt, createdAt:Date.now()
+  });
+  await save();
+  $("#amount-input").value="";
+  toast(`已记 · ${sel.person} ${sel.category} ¥${fmt(amt)}`);
+});
+
+/* ---------- 明细页 ---------- */
+function renderList(){
+  const body=$("#list-body");
+  let data=records.slice();
+  if(listFilter!=="all") data=data.filter(r=>r.person===listFilter);
+  data.sort((a,b)=> b.date.localeCompare(a.date) || b.createdAt-a.createdAt);
+
+  if(!data.length){
+    body.innerHTML=`<div class="empty"><div class="e-ball">🎾</div><p>还没有记录，去记一笔吧</p></div>`;
+    return;
+  }
+  // 按月分组
+  const groups={};
+  data.forEach(r=>{ const m=r.date.slice(0,7); (groups[m]=groups[m]||[]).push(r); });
+  let html="";
+  Object.keys(groups).sort((a,b)=>b.localeCompare(a)).forEach(m=>{
+    const items=groups[m];
+    const sum=items.reduce((s,r)=>s+r.amount,0);
+    const [y,mo]=m.split("-");
+    html+=`<div class="month-group"><div class="month-head"><span class="m">${y}年${+mo}月</span><span class="t">¥${fmt(sum)}</span></div>`;
+    items.forEach(r=>{
+      const c=catOf(r.category), w=WHO_COLOR[r.person];
+      html+=`<div class="rec" data-id="${r.id}">
+        <div class="badge" style="background:${c.color}1a;">${c.ic}</div>
+        <div class="meta">
+          <div class="top">${r.category}<span class="who" style="background:${w.bg};color:${w.fg}">${r.person}</span></div>
+          <div class="dt num">${r.date}</div>
+        </div>
+        <div class="amt num">¥${fmt(r.amount)}</div>
+        <button class="del" data-id="${r.id}">×</button>
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  body.innerHTML=html;
+
+  // 点击整条记录 → 打开编辑面板
+  body.querySelectorAll(".rec").forEach(el=>{
+    el.onclick=e=>{
+      if(e.target.closest(".del")) return; // 删除按钮单独处理
+      openEditor(el.dataset.id);
+    };
+  });
+
+  body.querySelectorAll(".del").forEach(b=>{
+    b.onclick=async (e)=>{
+      e.stopPropagation();
+      if(!confirm("删除这条记录？")) return;
+      records=records.filter(r=>r.id!==b.dataset.id);
+      await save(); renderList();
+      toast("已删除");
+    };
+  });
+}
+
+$("#list-filter").addEventListener("click",e=>{
+  const b=e.target.closest(".chip"); if(!b) return;
+  listFilter=b.dataset.f;
+  [...$("#list-filter").children].forEach(x=>x.classList.toggle("on",x===b));
+  renderList();
+});
+
+/* ---------- 编辑面板 ---------- */
+let editId=null;
+let editSel={person:"李翔", category:"场地费"};
+
+function buildEditCats(){
+  const wrap=$("#e-cats"); wrap.innerHTML="";
+  CATS.forEach(c=>{
+    const el=document.createElement("div");
+    el.className="cat"+(editSel.category===c.key?" on":"");
+    if(editSel.category===c.key) el.style.background=c.color;
+    el.innerHTML=`<span class="ic">${c.ic}</span><span class="nm">${c.key.replace("费","")}</span>`;
+    el.onclick=()=>{ editSel.category=c.key; buildEditCats(); };
+    wrap.appendChild(el);
+  });
+}
+
+function openEditor(id){
+  const r=records.find(x=>x.id===id); if(!r) return;
+  editId=id;
+  editSel.person=r.person;
+  editSel.category=r.category;
+  $("#e-date-input").value=r.date;
+  $("#e-amount-input").value=r.amount;
+  [...$("#e-person-seg").children].forEach(x=>x.classList.toggle("on",x.dataset.person===r.person));
+  buildEditCats();
+  $("#sheet-mask").classList.add("show");
+  $("#edit-sheet").classList.add("show");
+}
+function closeEditor(){
+  editId=null;
+  $("#sheet-mask").classList.remove("show");
+  $("#edit-sheet").classList.remove("show");
+}
+
+$("#e-person-seg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  editSel.person=b.dataset.person;
+  [...$("#e-person-seg").children].forEach(x=>x.classList.toggle("on",x===b));
+});
+
+$("#e-save-btn").addEventListener("click", async ()=>{
+  const amt=parseFloat($("#e-amount-input").value);
+  const date=$("#e-date-input").value;
+  if(!date){ toast("请选择日期"); return; }
+  if(!amt || amt<=0){ toast("请输入金额"); return; }
+  const r=records.find(x=>x.id===editId); if(!r){ closeEditor(); return; }
+  r.person=editSel.person; r.date=date; r.category=editSel.category; r.amount=amt;
+  await save();
+  closeEditor(); renderList();
+  toast("已保存修改");
+});
+
+$("#e-del-btn").addEventListener("click", async ()=>{
+  if(!confirm("删除这条记录？")) return;
+  records=records.filter(x=>x.id!==editId);
+  await save();
+  closeEditor(); renderList();
+  toast("已删除");
+});
+
+$("#sheet-mask").addEventListener("click", ()=>{ closeEditor(); closeExport(); closeImport(); });
+
+/* ---------- 导出 ---------- */
+let exportScope="all";
+
+function exportRows(){
+  let data=records.slice();
+  if(exportScope!=="all") data=data.filter(r=>r.person===exportScope);
+  data.sort((a,b)=> a.date.localeCompare(b.date) || a.createdAt-b.createdAt);
+  return data;
+}
+function buildCSV(){
+  const rows=exportRows();
+  const head=["日期","主体","类型","金额"];
+  const lines=[head.join(",")];
+  rows.forEach(r=>{
+    // 金额转字符串，类型/主体不含逗号，无需转义
+    lines.push([r.date, r.person, r.category, r.amount].join(","));
+  });
+  const total=rows.reduce((s,r)=>s+r.amount,0);
+  lines.push(["合计","","",total].join(","));
+  return lines.join("\r\n");
+}
+function exportFilename(){
+  const tag = exportScope==="all" ? "全部" : exportScope;
+  return `网球账本_${tag}_${todayStr()}.csv`;
+}
+
+function refreshExportSheet(){
+  const rows=exportRows();
+  const total=rows.reduce((s,r)=>s+r.amount,0);
+  $("#export-desc").innerHTML=`共 <b>${rows.length}</b> 笔记录，合计 <b>¥${fmt(total)}</b>。优先调用系统分享（可存到「文件」或发给自己），不支持时自动下载；也可直接复制。`;
+  $("#export-preview").value=buildCSV();
+}
+
+function openExport(){
+  exportScope="all";
+  [...$("#export-scope").children].forEach(x=>x.classList.toggle("on",x.dataset.s==="all"));
+  refreshExportSheet();
+  $("#sheet-mask").classList.add("show");
+  $("#export-sheet").classList.add("show");
+}
+function closeExport(){
+  $("#sheet-mask").classList.remove("show");
+  $("#export-sheet").classList.remove("show");
+}
+
+$("#open-export").addEventListener("click", openExport);
+$("#export-close").addEventListener("click", closeExport);
+
+$("#export-scope").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  exportScope=b.dataset.s;
+  [...$("#export-scope").children].forEach(x=>x.classList.toggle("on",x===b));
+  refreshExportSheet();
+});
+
+$("#export-share").addEventListener("click", async ()=>{
+  const csv="\uFEFF"+buildCSV();           // BOM，保证 Excel 中文不乱码
+  const fname=exportFilename();
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+
+  // 1) 系统分享（移动端最佳）
+  try{
+    const file=new File([blob],fname,{type:"text/csv"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:"网球账本"});
+      return;
+    }
+  }catch(e){ if(e && e.name==="AbortError") return; /* 用户取消 */ }
+
+  // 2) 下载文件
+  try{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download=fname; document.body.appendChild(a); a.click();
+    a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1500);
+    toast("已生成文件");
+    return;
+  }catch(e){ /* 继续走复制兜底 */ }
+
+  // 3) 兜底：复制
+  copyExport();
+});
+
+async function copyExport(){
+  const text=buildCSV();
+  try{
+    await navigator.clipboard.writeText(text);
+    toast("已复制，去 Excel 粘贴即可");
+    return;
+  }catch(e){}
+  // execCommand 兜底
+  const ta=$("#export-preview");
+  ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+  try{
+    document.execCommand("copy");
+    toast("已复制，去 Excel 粘贴即可");
+  }catch(e){
+    toast("请长按预览框手动复制");
+  }
+}
+$("#export-copy").addEventListener("click", copyExport);
+
+/* ---------- 导入 ---------- */
+let importMode="append";
+let importStaged=[];   // 解析出的待导入记录
+
+const VALID_PERSON=["李翔","傅聿昕"];
+const VALID_CAT=CATS.map(c=>c.key);
+
+function splitCSVLine(line){
+  // 支持 Excel 可能加上的引号；本应用字段不含逗号，简单处理即可
+  return line.split(",").map(c=>c.trim().replace(/^"(.*)"$/,"$1").trim());
+}
+
+function parseCSV(text){
+  const out={valid:[], skipped:0};
+  if(!text) return out;
+  text=text.replace(/^\uFEFF/,"");                 // 去 BOM
+  const lines=text.split(/\r\n|\n|\r/).map(l=>l.trim()).filter(Boolean);
+  lines.forEach(line=>{
+    const cells=splitCSVLine(line);
+    const [date,person,category,amountRaw]=cells;
+    if(!date) { return; }
+    if(date==="日期" || date==="合计") return;       // 跳过表头与合计行
+    const amount=parseFloat(amountRaw);
+    const okDate=/^\d{4}-\d{2}-\d{2}$/.test(date);
+    if(okDate && VALID_PERSON.includes(person) && VALID_CAT.includes(category) && amount>0){
+      out.valid.push({
+        id:Date.now()+""+Math.floor(Math.random()*1e6)+out.valid.length,
+        person, date, category, amount, createdAt:Date.now()+out.valid.length
+      });
+    }else{
+      out.skipped++;
+    }
+  });
+  return out;
+}
+
+function showImportResult(res){
+  const box=$("#import-result");
+  importStaged=res.valid;
+  if(!res.valid.length){
+    box.className="import-result err";
+    box.innerHTML="没有识别到有效记录。请确认内容是本账本导出的 CSV（日期 / 主体 / 类型 / 金额）。";
+    $("#import-confirm").disabled=true;
+    return;
+  }
+  const modeTxt = importMode==="replace" ? "覆盖全部现有记录" : "追加到现有记录";
+  let msg=`识别到 <b>${res.valid.length}</b> 条有效记录`;
+  if(res.skipped) msg+=`，跳过 <b>${res.skipped}</b> 条无法识别的行`;
+  msg+=`。确认后将<b>${modeTxt}</b>。`;
+  box.className = res.skipped ? "import-result warn" : "import-result ok";
+  box.innerHTML=msg;
+  $("#import-confirm").disabled=false;
+}
+
+function openImport(){
+  importMode="append"; importStaged=[];
+  [...$("#import-mode").children].forEach(x=>x.classList.toggle("on",x.dataset.m==="append"));
+  $("#import-paste").value="";
+  $("#import-file").value="";
+  $("#import-result").className="import-result";
+  $("#import-result").innerHTML="";
+  $("#import-confirm").disabled=true;
+  $("#sheet-mask").classList.add("show");
+  $("#import-sheet").classList.add("show");
+}
+function closeImport(){
+  $("#sheet-mask").classList.remove("show");
+  $("#import-sheet").classList.remove("show");
+}
+
+$("#open-import").addEventListener("click", openImport);
+$("#import-close").addEventListener("click", closeImport);
+
+$("#import-mode").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  importMode=b.dataset.m;
+  [...$("#import-mode").children].forEach(x=>x.classList.toggle("on",x===b));
+  if(importStaged.length) showImportResult({valid:importStaged,skipped:0}); // 刷新提示文案
+});
+
+$("#import-pick").addEventListener("click", ()=> $("#import-file").click());
+$("#import-file").addEventListener("change", async e=>{
+  const file=e.target.files && e.target.files[0];
+  if(!file) return;
+  try{
+    const text=await file.text();
+    // 预览框只展示前若干字符，解析始终用完整内容
+    $("#import-paste").value = text.length>4000 ? text.slice(0,4000)+"\n…（仅预览，导入为完整内容）" : text;
+    showImportResult(parseCSV(text));
+  }catch(err){
+    $("#import-result").className="import-result err";
+    $("#import-result").innerHTML="读取文件失败，请改用「粘贴」方式。";
+  }
+});
+
+$("#import-parse").addEventListener("click", ()=>{
+  const text=$("#import-paste").value;
+  if(!text.trim()){ toast("请先粘贴内容"); return; }
+  showImportResult(parseCSV(text));
+});
+
+$("#import-confirm").addEventListener("click", async ()=>{
+  if(!importStaged.length) return;
+  if(importMode==="replace"){
+    if(!confirm(`覆盖导入会清空现有全部记录，替换为这 ${importStaged.length} 条。确定？`)) return;
+    records=importStaged.slice();
+  }else{
+    records=records.concat(importStaged);
+  }
+  await save();
+  const n=importStaged.length;
+  importStaged=[];
+  closeImport();
+  renderList();
+  toast(`已导入 ${n} 条记录`);
+});
+
+/* ---------- 统计页 ---------- */
+function renderStats(){
+  const body=$("#stats-body");
+  let data=records.slice();
+  if(statFilter!=="all") data=data.filter(r=>r.person===statFilter);
+
+  if(!data.length){
+    body.innerHTML=`<div class="empty"><div class="e-ball">🎾</div><p>还没有数据可统计</p></div>`;
+    return;
+  }
+  const total=data.reduce((s,r)=>s+r.amount,0);
+
+  // 分类
+  const byCat={};
+  CATS.forEach(c=>byCat[c.key]=0);
+  data.forEach(r=>byCat[r.category]+=r.amount);
+  const catMax=Math.max(...Object.values(byCat));
+
+  // 主体
+  const byPerson={"李翔":0,"傅聿昕":0};
+  records.forEach(r=>{ if(byPerson[r.person]!==undefined) byPerson[r.person]+=r.amount; });
+  const allTotal=byPerson["李翔"]+byPerson["傅聿昕"];
+
+  // 月度
+  const byMonth={};
+  data.forEach(r=>{ const m=r.date.slice(0,7); byMonth[m]=(byMonth[m]||0)+r.amount; });
+  const months=Object.keys(byMonth).sort();
+  const monMax=Math.max(...Object.values(byMonth));
+
+  let html=`
+  <div class="score">
+    <div class="lab">${statFilter==="all"?"累计支出":statFilter+" · 累计支出"}</div>
+    <div class="big num"><small>¥</small>${fmt(total)}</div>
+    <div class="cnt num">${data.length} 笔记录</div>
+  </div>`;
+
+  // 分类面板
+  html+=`<div class="panel"><h3>按类型</h3>`;
+  CATS.forEach(c=>{
+    const v=byCat[c.key];
+    const pct=total? Math.round(v/total*100):0;
+    const w=catMax? (v/catMax*100):0;
+    html+=`<div class="bar-row">
+      <div class="lh"><span class="l">${c.ic} ${c.key}</span><span class="v num">¥${fmt(v)}<span class="pct">${pct}%</span></span></div>
+      <div class="track"><div class="fill" style="width:${w}%;background:${c.color}"></div></div>
+    </div>`;
+  });
+  html+=`</div>`;
+
+  // 主体面板（始终展示两人对比，不受筛选影响）
+  html+=`<div class="panel"><h3>按主体</h3><div class="split">`;
+  ["李翔","傅聿昕"].forEach(p=>{
+    const v=byPerson[p];
+    const pct=allTotal? Math.round(v/allTotal*100):0;
+    const w=WHO_COLOR[p];
+    html+=`<div class="half" style="background:${w.bg}"><div class="nm" style="color:${w.fg}">${p}</div><div class="v num" style="color:${w.fg}">¥${fmt(v)}</div><div class="pct">占 ${pct}%</div></div>`;
+  });
+  html+=`</div></div>`;
+
+  // 月度面板
+  if(months.length){
+    html+=`<div class="panel"><h3>按月份</h3>`;
+    months.forEach(m=>{
+      const v=byMonth[m], w=monMax?(v/monMax*100):0;
+      const [y,mo]=m.split("-");
+      html+=`<div class="bar-row">
+        <div class="lh"><span class="l num">${y}/${mo}</span><span class="v num">¥${fmt(v)}</span></div>
+        <div class="track"><div class="fill" style="width:${w}%;background:var(--court)"></div></div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  body.innerHTML=html;
+}
+
+$("#stat-filter").addEventListener("click",e=>{
+  const b=e.target.closest(".chip"); if(!b) return;
+  statFilter=b.dataset.f;
+  [...$("#stat-filter").children].forEach(x=>x.classList.toggle("on",x===b));
+  renderStats();
+});
+
+/* ---------- 导航 ---------- */
+document.querySelector("nav").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  const tab=b.dataset.tab;
+  [...document.querySelector("nav").children].forEach(x=>x.classList.toggle("on",x===b));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  $("#view-"+tab).classList.add("active");
+  if(tab==="list") renderList();
+  if(tab==="stats") renderStats();
+});
+
+/* ---------- 初始化 ---------- */
+(async function init(){
+  $("#date-input").value=todayStr();
+  buildCats();
+  await load();
+})();
+</script>
+</body>
+</html>

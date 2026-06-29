@@ -29,6 +29,8 @@
     --c-gear:#3a6ea5;
     --c-spar:#8d5bbd;
     --c-comp:#c1452e;
+    --c-fit:#b5396b;
+    --c-stretch:#2a9d8f;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
@@ -84,7 +86,7 @@
   .seg button.on{background:var(--court);color:#fff;}
   .seg.ball button.on{background:var(--ball);color:var(--court);}
 
-  .cats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+  .cats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
   .cat{
     border:1px solid var(--hair);background:var(--card);border-radius:14px;
     padding:12px 4px 10px;text-align:center;cursor:pointer;transition:all .18s;
@@ -106,6 +108,9 @@
   }
   .amount-box input::placeholder{color:rgba(255,255,255,.25);}
 
+  .aa-hint{font-size:13px;color:var(--c-stretch);font-weight:600;margin-top:8px;min-height:1px;}
+  .aa-hint.show{padding-left:2px;}
+
   input[type=date]{
     width:100%;background:var(--card);border:1px solid var(--hair);border-radius:14px;
     padding:13px 14px;font-size:15px;font-family:inherit;color:var(--ink);outline:0;
@@ -120,7 +125,7 @@
   .save-btn:disabled{opacity:.4;cursor:not-allowed;}
 
   /* ---------- 明细 ---------- */
-  .filter-row{display:flex;gap:8px;margin-bottom:14px;}
+  .filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
   .chip{
     border:1px solid var(--hair);background:var(--card);border-radius:20px;
     padding:7px 16px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;
@@ -168,6 +173,7 @@
 
   .panel{background:var(--card);border:1px solid var(--hair);border-radius:18px;padding:18px;margin-bottom:16px;}
   .panel h3{margin:0 0 14px;font-size:14px;font-weight:700;letter-spacing:.3px;}
+  .aa-note{margin-top:12px;font-size:12.5px;color:var(--ink-soft);background:#f1f1ea;border-radius:10px;padding:9px 12px;text-align:center;}
 
   .bar-row{margin-bottom:13px;}
   .bar-row:last-child{margin-bottom:0;}
@@ -286,6 +292,7 @@
       <div class="seg" id="person-seg">
         <button data-person="李翔" class="on">李翔</button>
         <button data-person="傅聿昕">傅聿昕</button>
+        <button data-person="共同">共同</button>
       </div>
     </div>
 
@@ -305,6 +312,7 @@
         <span class="cny">¥</span>
         <input type="text" inputmode="decimal" id="amount-input" placeholder="0">
       </div>
+      <div class="aa-hint" id="aa-hint"></div>
     </div>
 
     <button class="save-btn" id="save-btn">记 一 笔</button>
@@ -317,6 +325,7 @@
         <button class="chip on" data-f="all">全部</button>
         <button class="chip" data-f="李翔">李翔</button>
         <button class="chip" data-f="傅聿昕">傅聿昕</button>
+        <button class="chip" data-f="共同">共同</button>
       </div>
       <div class="toolbar-actions">
         <button class="export-btn" id="open-import">↥ 导入</button>
@@ -332,6 +341,7 @@
       <button class="chip on" data-f="all">全部</button>
       <button class="chip" data-f="李翔">李翔</button>
       <button class="chip" data-f="傅聿昕">傅聿昕</button>
+      <button class="chip" data-f="共同">共同</button>
     </div>
     <div id="stats-body"></div>
   </section>
@@ -356,6 +366,7 @@
     <div class="seg" id="e-person-seg">
       <button data-person="李翔">李翔</button>
       <button data-person="傅聿昕">傅聿昕</button>
+      <button data-person="共同">共同</button>
     </div>
   </div>
 
@@ -375,6 +386,7 @@
       <span class="cny">¥</span>
       <input type="text" inputmode="decimal" id="e-amount-input" placeholder="0">
     </div>
+    <div class="aa-hint" id="e-aa-hint"></div>
   </div>
 
   <button class="save-btn" id="e-save-btn">保 存 修 改</button>
@@ -442,8 +454,10 @@ const CATS = [
   {key:"装备费", ic:"🎒", color:"var(--c-gear)"},
   {key:"陪练费", ic:"🤝", color:"var(--c-spar)"},
   {key:"参赛费", ic:"🏆", color:"var(--c-comp)"},
+  {key:"体能费", ic:"💪", color:"var(--c-fit)"},
+  {key:"拉伸费", ic:"🧘", color:"var(--c-stretch)"},
 ];
-const WHO_COLOR = {"李翔":{bg:"#e2efe8",fg:"#16432f"}, "傅聿昕":{bg:"#fbf0d9",fg:"#9a5e15"}};
+const WHO_COLOR = {"李翔":{bg:"#e2efe8",fg:"#16432f"}, "傅聿昕":{bg:"#fbf0d9",fg:"#9a5e15"}, "共同":{bg:"#e0eef0",fg:"#1d5b66"}};
 const STORE_KEY = "tennis-ledger:records";
 
 let records = [];
@@ -508,11 +522,25 @@ function buildCats(){
   });
 }
 
+function updateAAHint(){
+  const el=$("#aa-hint");
+  const amt=parseFloat($("#amount-input").value);
+  if(sel.person==="共同"){
+    el.classList.add("show");
+    el.textContent = amt>0 ? `AA 平摊 · 每人 ¥${fmt(amt/2)}` : "AA 平摊 · 金额填总额，自动按一人一半";
+  }else{
+    el.classList.remove("show");
+    el.textContent="";
+  }
+}
+
 $("#person-seg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return;
   sel.person=b.dataset.person;
   [...$("#person-seg").children].forEach(x=>x.classList.toggle("on",x===b));
+  updateAAHint();
 });
+$("#amount-input").addEventListener("input", updateAAHint);
 
 $("#save-btn").addEventListener("click", async ()=>{
   const amt=parseFloat($("#amount-input").value);
@@ -525,7 +553,9 @@ $("#save-btn").addEventListener("click", async ()=>{
   });
   await save();
   $("#amount-input").value="";
-  toast(`已记 · ${sel.person} ${sel.category} ¥${fmt(amt)}`);
+  updateAAHint();
+  const tail = sel.person==="共同" ? `（AA 每人 ¥${fmt(amt/2)}）` : "";
+  toast(`已记 · ${sel.person} ${sel.category} ¥${fmt(amt)}${tail}`);
 });
 
 /* ---------- 明细页 ---------- */
@@ -550,11 +580,12 @@ function renderList(){
     html+=`<div class="month-group"><div class="month-head"><span class="m">${y}年${+mo}月</span><span class="t">¥${fmt(sum)}</span></div>`;
     items.forEach(r=>{
       const c=catOf(r.category), w=WHO_COLOR[r.person];
+      const aa = r.person==="共同" ? ` · AA 每人 ¥${fmt(r.amount/2)}` : "";
       html+=`<div class="rec" data-id="${r.id}">
         <div class="badge" style="background:${c.color}1a;">${c.ic}</div>
         <div class="meta">
           <div class="top">${r.category}<span class="who" style="background:${w.bg};color:${w.fg}">${r.person}</span></div>
-          <div class="dt num">${r.date}</div>
+          <div class="dt num">${r.date}${aa}</div>
         </div>
         <div class="amt num">¥${fmt(r.amount)}</div>
         <button class="del" data-id="${r.id}">×</button>
@@ -606,6 +637,18 @@ function buildEditCats(){
   });
 }
 
+function updateEditAAHint(){
+  const el=$("#e-aa-hint");
+  const amt=parseFloat($("#e-amount-input").value);
+  if(editSel.person==="共同"){
+    el.classList.add("show");
+    el.textContent = amt>0 ? `AA 平摊 · 每人 ¥${fmt(amt/2)}` : "AA 平摊 · 金额填总额，自动按一人一半";
+  }else{
+    el.classList.remove("show");
+    el.textContent="";
+  }
+}
+
 function openEditor(id){
   const r=records.find(x=>x.id===id); if(!r) return;
   editId=id;
@@ -615,6 +658,7 @@ function openEditor(id){
   $("#e-amount-input").value=r.amount;
   [...$("#e-person-seg").children].forEach(x=>x.classList.toggle("on",x.dataset.person===r.person));
   buildEditCats();
+  updateEditAAHint();
   $("#sheet-mask").classList.add("show");
   $("#edit-sheet").classList.add("show");
 }
@@ -628,7 +672,9 @@ $("#e-person-seg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return;
   editSel.person=b.dataset.person;
   [...$("#e-person-seg").children].forEach(x=>x.classList.toggle("on",x===b));
+  updateEditAAHint();
 });
+$("#e-amount-input").addEventListener("input", updateEditAAHint);
 
 $("#e-save-btn").addEventListener("click", async ()=>{
   const amt=parseFloat($("#e-amount-input").value);
@@ -758,7 +804,7 @@ $("#export-copy").addEventListener("click", copyExport);
 let importMode="append";
 let importStaged=[];   // 解析出的待导入记录
 
-const VALID_PERSON=["李翔","傅聿昕"];
+const VALID_PERSON=["李翔","傅聿昕","共同"];
 const VALID_CAT=CATS.map(c=>c.key);
 
 function splitCSVLine(line){
@@ -889,10 +935,14 @@ function renderStats(){
   data.forEach(r=>byCat[r.category]+=r.amount);
   const catMax=Math.max(...Object.values(byCat));
 
-  // 主体
-  const byPerson={"李翔":0,"傅聿昕":0};
-  records.forEach(r=>{ if(byPerson[r.person]!==undefined) byPerson[r.person]+=r.amount; });
-  const allTotal=byPerson["李翔"]+byPerson["傅聿昕"];
+  // 主体（AA 平摊后实际支出，始终基于全部记录，不受筛选影响）
+  let own={"李翔":0,"傅聿昕":0}, sharedTotal=0;
+  records.forEach(r=>{
+    if(r.person==="共同") sharedTotal+=r.amount;
+    else if(own[r.person]!==undefined) own[r.person]+=r.amount;
+  });
+  const eff={"李翔":own["李翔"]+sharedTotal/2, "傅聿昕":own["傅聿昕"]+sharedTotal/2};
+  const allTotal=eff["李翔"]+eff["傅聿昕"];
 
   // 月度
   const byMonth={};
@@ -920,15 +970,19 @@ function renderStats(){
   });
   html+=`</div>`;
 
-  // 主体面板（始终展示两人对比，不受筛选影响）
-  html+=`<div class="panel"><h3>按主体</h3><div class="split">`;
+  // 主体面板（AA 平摊后，始终展示两人对比，不受筛选影响）
+  html+=`<div class="panel"><h3>按主体 · AA 平摊后</h3><div class="split">`;
   ["李翔","傅聿昕"].forEach(p=>{
-    const v=byPerson[p];
+    const v=eff[p];
     const pct=allTotal? Math.round(v/allTotal*100):0;
     const w=WHO_COLOR[p];
     html+=`<div class="half" style="background:${w.bg}"><div class="nm" style="color:${w.fg}">${p}</div><div class="v num" style="color:${w.fg}">¥${fmt(v)}</div><div class="pct">占 ${pct}%</div></div>`;
   });
-  html+=`</div></div>`;
+  html+=`</div>`;
+  if(sharedTotal>0){
+    html+=`<div class="aa-note">含共同支出 ¥${fmt(sharedTotal)}，每人已平摊 ¥${fmt(sharedTotal/2)}</div>`;
+  }
+  html+=`</div>`;
 
   // 月度面板
   if(months.length){
